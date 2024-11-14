@@ -1,10 +1,9 @@
 
-use nalgebra_glm::{Vec3, Vec4, Mat3, dot, mat4_to_mat3};
+use nalgebra_glm::{Vec3, Vec4, Mat3, mat4_to_mat3};
 use crate::vertex::Vertex;
 use crate::Uniforms;
 use crate::fragment::Fragment;
 use crate::color::Color;
-use std::f32::consts::PI;
 use rand::Rng;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
@@ -55,6 +54,7 @@ pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, shader_type: &s
       "continents_shader" => continents_shader(fragment, uniforms),
       "rings_shader" => rings_shader(fragment, uniforms),
       "spiral_shader" => spiral_shader(fragment, uniforms),
+      "spaceship_shader" => spaceship_shader(fragment, uniforms),
       _ => Color::new(0, 0, 0),
   }
 }
@@ -202,6 +202,7 @@ fn lava_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
 }
 
 fn gradient_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+    let _ = uniforms;
   let gradient_start = Color::new(0, 0, 255); // Color 1
   let gradient_end = Color::new(255, 0, 0);   //Color 2
 
@@ -217,7 +218,7 @@ fn continents_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   let oy = 45.0;
   let x = fragment.vertex_position.x;
   let y = fragment.vertex_position.y;
-  let t = uniforms.time as f32 * 0.15; // Velocidad de movimiento
+  let t = uniforms.time as f32 * 0.3; // Velocidad rotacion
 
   //Rotacion
   let noise_value = uniforms.noise.get_noise_2d(x * zoom + ox + t, y * zoom + oy);
@@ -237,22 +238,23 @@ fn continents_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
 }
 
 fn rings_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+    let _ = uniforms;
   let x = fragment.vertex_position.x;
   let y = fragment.vertex_position.y;
 
   // Distancia al centro
   let distance = (x * x + y * y).sqrt();
 
-  let color_blue = Color::new(0, 0, 255);       // Azul
-  let color_silver = Color::new(192, 192, 192); // Plateado
-  let color_emerald = Color::new(80, 200, 120); // Verde esmeralda
+  let color_blue = Color::new(0, 0, 255);       
+  let color_silver = Color::new(192, 192, 192);
+  let color_emerald = Color::new(80, 200, 120);
 
-  let ring_width = 0.2; // Ancho de los anillos
-  let ring_spacing = 0.5; // Espaciado entre anillos
+  let ring_width = 0.3; // Ancho de los anillos
+  let ring_spacing = 0.6; // Espaciado entre anillos
 
   let ring_pattern = (distance / ring_spacing).floor();
 
-  let base_color = if ring_pattern % 2.0 == 0.0 {
+  let base_color = if ring_pattern % 1.5 == 0.0 {
       color_blue
   } else if ring_pattern % 3.0 == 1.0 {
       color_silver
@@ -295,4 +297,19 @@ fn spiral_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   };
 
   final_color * fragment.intensity
+}
+
+fn spaceship_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+  let light_dir = Vec3::new(0.5, -1.0, -0.5).normalize();  // Dirección de la luz
+  let view_dir = Vec3::new(0.0, 0.0, 1.0).normalize();     // Dirección de la cámara
+  let normal = fragment.normal.normalize();
+  let diffuse_intensity = normal.dot(&light_dir).max(0.0);
+
+  //reflejo por metal
+  let reflect_dir = (2.0 * normal * normal.dot(&light_dir) - light_dir).normalize();
+  let specular_intensity = view_dir.dot(&reflect_dir).max(0.0).powf(32.0);
+  let base_color = Color::new(202, 107, 7);
+
+  let color = base_color * diffuse_intensity + Color::new(202, 107, 7)* specular_intensity;
+  color.clamp()
 }

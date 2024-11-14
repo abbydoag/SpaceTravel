@@ -27,6 +27,14 @@ impl Color {
         ((self.r as u32) << 16) | ((self.g as u32) << 8) | (self.b as u32)
     }
 
+    pub fn clamp(&self) -> Color {
+        Color {
+            r: self.r.clamp(0, 255),
+            g: self.g.clamp(0, 255),
+            b: self.b.clamp(0, 255),
+        }
+    }
+
     // Métodos para acceder a los componentes de color
     pub fn r(&self) -> u8 {
         self.r

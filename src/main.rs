@@ -18,7 +18,7 @@ use obj::Obj;
 use camera::Camera;
 use triangle::triangle;
 use shaders::{vertex_shader, fragment_shader};
-use fastnoise_lite::{FastNoiseLite, NoiseType, FractalType};
+use fastnoise_lite::{FastNoiseLite, NoiseType};
 use rand::Rng;
 
 //planetas
@@ -195,7 +195,7 @@ fn main() {
     let mut camera = Camera::new(
         Vec3::new(0.0, 0.0, 5.0),
         Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(0.0, 4.0, 0.0),
     );
 
     let num_stars = 40;
@@ -206,6 +206,8 @@ fn main() {
     let vertex_arrays = obj.get_vertex_array();
     let rings_obj = Obj::load("assets/models/rings.obj").expect("Failed to load rings obj");
     let rings_vertex_arrays = rings_obj.get_vertex_array();
+    let ship = Obj::load("assets/models/nave.obj").expect("Failed to load obj");
+    let ship_vertex_arrays = ship.get_vertex_array();
 
     let mut current_planet = Planet::None;
     let mut time = 0;
@@ -236,6 +238,8 @@ fn main() {
         };
 
         framebuffer.set_current_color(0xFFDDDD);
+
+        render(&mut framebuffer, &uniforms, &ship_vertex_arrays, "spaceship_shader");
         match current_planet {
             Planet::PlainPlanet => {
                 render(&mut framebuffer, &uniforms, &vertex_arrays, "continents_shader");
