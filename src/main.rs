@@ -11,6 +11,7 @@ mod color;
 mod fragment;
 mod shaders;
 mod camera;
+mod audio;
 
 use framebuffer::Framebuffer;
 use vertex::Vertex;
@@ -20,6 +21,7 @@ use triangle::triangle;
 use shaders::{vertex_shader, fragment_shader};
 use fastnoise_lite::{FastNoiseLite, NoiseType};
 use rand::Rng;
+use audio::AudioPlayer;
 
 //planetas
 #[derive(PartialEq)]
@@ -186,6 +188,10 @@ fn main() {
 
     framebuffer.set_background_color(0x151515);
 
+    //Musica
+    let audio_player = AudioPlayer::new("assets/music/September.mp3");
+    audio_player.play();
+
     // Model parameters (translation, scale, rotation)
     let translation = Vec3::new(0.0, 0.0, 0.0);
     let rotation = Vec3::new(0.0, 0.0, 0.0);
@@ -198,7 +204,7 @@ fn main() {
         Vec3::new(0.0, 4.0, 0.0),
     );
 
-    let num_stars = 40;
+    let num_stars = 80;
     render_background(&mut framebuffer, num_stars); 
 
     // Load 3D Objects
