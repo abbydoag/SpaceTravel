@@ -1,0 +1,12 @@
+# Space Travel
+Proyecto final de Gráficas por Computadora
+Simulacion de un pequeño sistema solar con shaders, con
+una estética similar a videojuegos de consolas como la
+Nintendo 64.
+**controles**
+🠕: Avanza hacia adelante
+🠗: Avanza hacía atras
+🠖: Giro a la derecha
+🠔: Giro a la izquierda
+
+**Demo**

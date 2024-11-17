@@ -10,7 +10,7 @@ impl Spaceship {
     pub fn new(start_position: Vec3) -> Self {
         Self {
             position: start_position,
-            forward: Vec3::new(0.0, 0.0, 1.0),
+            forward: Vec3::new(0.0, 0.0, -1.3),
             up: Vec3::new(0.0, 1.0, 0.0),       
         }
     }

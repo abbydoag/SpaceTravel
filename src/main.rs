@@ -1,4 +1,3 @@
-use nalgebra::ComplexField;
 use nalgebra_glm::{Vec3, Mat4, look_at, perspective};
 use minifb::{Key, Window, WindowOptions};
 use std::time::Duration;
@@ -31,6 +30,14 @@ use spaceship::Spaceship;
 enum Planet{
     None
 }
+
+struct Orbit {
+    //Distancia sol
+    radius: f32, 
+    speed: f32,   
+    angle: f32
+}
+
 pub struct Uniforms {
     model_matrix: Mat4,
     view_matrix: Mat4,
@@ -167,7 +174,6 @@ fn render_background(framebuffer: &mut Framebuffer, num_stars: u32) {
         framebuffer.set_background_star(x, y, 0xFFFFFF);
     }
 }
-
 fn main() {
     let window_width = 800;
     let window_height = 600;
@@ -198,23 +204,27 @@ fn main() {
 
     // Cámara
     let mut camera = Camera::new(
-        Vec3::new(0.0, 5.0, -10.0),
+        Vec3::new(0.0, 5.0, -20.0),
         spaceship.position,
         Vec3::new(0.0, 1.0, 0.0),
     );
-
-    let mut zoom_level: f32 = 10.0;
-    let zoom_speed = 1.0;
-
-    // Planetas cordenandas
-    let planet_positions = vec![
-        Vec3::new(7.3, 0.0, 4.0),
-        Vec3::new(-4.0, 5.0, -8.0),
-        Vec3::new(8.0, -3.0, -3.0), 
-        Vec3::new(-2.0, 2.0, 6.0),
-        Vec3::new(2.0, 3.0, 1.0)
+    
+    let sun_position = Vec3::new(0.0, 0.0, 0.0);
+    // Movumintos planetas y posiciones
+    let mut orbits = vec![
+        Orbit { radius: 4.0, speed: 0.003, angle: 2.0 }, 
+        Orbit { radius: 7.0, speed: 0.01, angle: 0.0 },
+        Orbit { radius: 9.0, speed: 0.004, angle: 0.0 },
+        Orbit { radius: 12.0, speed: 0.009, angle: 0.0 }
     ];
-
+    
+    let mut planet_positions = vec![
+        Vec3::new(4.1, 0.0, -2.3),
+        Vec3::new(-5.0, -0.1, 2.5),
+        Vec3::new(2.1, 0.0, -4.4), 
+        Vec3::new(-1.0, 0.1, 5.0)
+    ];
+    
     let num_stars = 80;
     render_background(&mut framebuffer, num_stars);
 
@@ -236,6 +246,26 @@ fn main() {
 
         framebuffer.clear();
 
+        //sol, centro sistema
+        let sun_model_matrix = create_model_matrix(sun_position, 1.5, Vec3::new(0.0, 0.0, 0.0)); // Tamaño 1.5
+        let sun_uniforms = Uniforms {
+            model_matrix: sun_model_matrix,
+            view_matrix: create_view_matrix(camera.eye, camera.center, camera.up),
+            projection_matrix: create_perspective_matrix(window_width as f32, window_height as f32),
+            viewport_matrix: create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32),
+            time,
+            noise: create_noise(),
+        };
+
+        for (i, orbit) in orbits.iter_mut().enumerate() {
+            orbit.angle += orbit.speed; //angfulo orbita
+            let x = sun_position.x + orbit.radius * orbit.angle.cos();
+            let z = sun_position.z + orbit.radius * orbit.angle.sin();
+            planet_positions[i] = Vec3::new(x, 0.0, z); //nueva posiicon
+        }
+
+        render(&mut framebuffer, &sun_uniforms, &vertex_arrays, "lava_shader");
+
         //planetas
         for (i, &position) in planet_positions.iter().enumerate() {
             let model_matrix = create_model_matrix(position, 1.0, Vec3::new(0.0, 0.0, 0.0));
@@ -243,8 +273,7 @@ fn main() {
                 0 => "continents_shader",
                 1 => "another_shader",
                 2 => "gradient_shader",
-                3 => "lava_shader",
-                4 => "lines_shader",
+                3 => "lines_shader",
                 _ => "default_shader",
             };
 
@@ -302,7 +331,7 @@ fn handle_input(window: &Window, spaceship: &mut Spaceship, camera: &mut Camera,
         spaceship.rotate(-rotation_speed); 
     }
     if window.is_key_down(Key::Left) {
-        spaceship.rotate(rotation_speed);
+        spaceship.rotate( rotation_speed);
     }
 
     let mut movement = Vec3::new(0.0, 0.0, 0.0); // Movimiento 3D
