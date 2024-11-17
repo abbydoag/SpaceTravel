@@ -5,16 +5,24 @@ pub struct Camera {
   pub eye: Vec3,
   pub center: Vec3,
   pub up: Vec3,
-  pub has_changed: bool
+  pub has_changed: bool,
+  pub right : Vec3,
+  pub forward: Vec3
 }
 
 impl Camera {
   pub fn new(eye: Vec3, center: Vec3, up: Vec3) -> Self {
+    let forward = (center - eye).normalize();  // Dirección hacia donde mira la cámara
+    let right = forward.cross(&up).normalize(); // Dirección a la derecha
+    let up = right.cross(&forward).normalize();
+    
     Camera {
       eye,
       center,
       up,
       has_changed: true,
+      right,
+      forward
     }
   }
 
@@ -72,6 +80,11 @@ impl Camera {
     let final_rotated = rotate_vec3(&rotated, angle_y, &right);
 
     self.center = self.eye + final_rotated.normalize() * radius;
+    self.has_changed = true;
+  }
+
+  pub fn move_camera(&mut self, direction: Vec3) {
+    self.eye += direction.x * self.right + direction.y * self.up + direction.z * self.forward;
     self.has_changed = true;
   }
 

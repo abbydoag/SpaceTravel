@@ -1,5 +1,6 @@
+use nalgebra::ComplexField;
 use nalgebra_glm::{Vec3, Mat4, look_at, perspective};
-use minifb::{Key, KeyRepeat, Window, WindowOptions};
+use minifb::{Key, Window, WindowOptions};
 use std::time::Duration;
 use std::f32::consts::PI;
 
@@ -12,6 +13,7 @@ mod fragment;
 mod shaders;
 mod camera;
 mod audio;
+mod spaceship;
 
 use framebuffer::Framebuffer;
 use vertex::Vertex;
@@ -22,18 +24,12 @@ use shaders::{vertex_shader, fragment_shader};
 use fastnoise_lite::{FastNoiseLite, NoiseType};
 use rand::Rng;
 use audio::AudioPlayer;
+use spaceship::Spaceship;
 
 //planetas
 #[derive(PartialEq)]
 enum Planet{
-    None,
-    PlainPlanet,
-    RingPlanet,
-    GasGigant,
-    Sun,
-    LinesPlanet,
-    GradientPlanet,
-    DotPlanet
+    None
 }
 pub struct Uniforms {
     model_matrix: Mat4,
@@ -115,6 +111,12 @@ fn create_viewport_matrix(width: f32, height: f32) -> Mat4 {
     )
 }
 
+//limites
+fn collision(position: Vec3, planet_position: Vec3, planet_radius: f32) -> bool{
+    let distance = (position - planet_position).norm();
+    distance < planet_radius
+}
+
 fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Vertex], shader_type: &str) {
     // Vertex Shader
     let mut transformed_vertices = Vec::with_capacity(vertex_array.len());
@@ -173,7 +175,6 @@ fn main() {
     let framebuffer_height = 600;
     let frame_delay = Duration::from_millis(16);
 
-
     let mut framebuffer = Framebuffer::new(framebuffer_width, framebuffer_height);
     let mut window = Window::new(
         "Space Travel",
@@ -188,34 +189,40 @@ fn main() {
 
     framebuffer.set_background_color(0x151515);
 
-    //Musica
+    // Música
     let audio_player = AudioPlayer::new("assets/music/September.mp3");
     audio_player.play();
 
-    // Model parameters (translation, scale, rotation)
-    let translation = Vec3::new(0.0, 0.0, 0.0);
-    let rotation = Vec3::new(0.0, 0.0, 0.0);
-    let scale = 1.0f32;
+    // Nave
+    let mut spaceship = Spaceship::new(Vec3::new(0.0, 0.0, 4.0));
 
-    // Camera parameters
+    // Cámara
     let mut camera = Camera::new(
-        Vec3::new(0.0, 0.0, 5.0),
-        Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(0.0, 4.0, 0.0),
+        Vec3::new(0.0, 5.0, -10.0),
+        spaceship.position,
+        Vec3::new(0.0, 1.0, 0.0),
     );
 
-    let num_stars = 80;
-    render_background(&mut framebuffer, num_stars); 
+    let mut zoom_level: f32 = 10.0;
+    let zoom_speed = 1.0;
 
-    // Load 3D Objects
+    // Planetas cordenandas
+    let planet_positions = vec![
+        Vec3::new(7.3, 0.0, 4.0),
+        Vec3::new(-4.0, 5.0, -8.0),
+        Vec3::new(8.0, -3.0, -3.0), 
+        Vec3::new(-2.0, 2.0, 6.0),
+        Vec3::new(2.0, 3.0, 1.0)
+    ];
+
+    let num_stars = 80;
+    render_background(&mut framebuffer, num_stars);
+
+    //modelos
     let obj = Obj::load("assets/models/sphere.obj").expect("Failed to load obj");
     let vertex_arrays = obj.get_vertex_array();
-    let rings_obj = Obj::load("assets/models/rings.obj").expect("Failed to load rings obj");
-    let rings_vertex_arrays = rings_obj.get_vertex_array();
     let ship = Obj::load("assets/models/nave.obj").expect("Failed to load obj");
     let ship_vertex_arrays = ship.get_vertex_array();
-
-    let mut current_planet = Planet::None;
     let mut time = 0;
 
     while window.is_open() {
@@ -225,52 +232,45 @@ fn main() {
 
         time += 1;
 
-        handle_input(&window, &mut camera, &mut current_planet);
+        handle_input(&window, &mut spaceship, &mut camera,  &planet_positions);
 
-        framebuffer.clear(); 
+        framebuffer.clear();
 
-        let noise = create_noise();
-        let model_matrix = create_model_matrix(translation, scale, rotation);
-        let view_matrix = create_view_matrix(camera.eye, camera.center, camera.up);
-        let projection_matrix = create_perspective_matrix(window_width as f32, window_height as f32);
-        let viewport_matrix = create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32);
+        //planetas
+        for (i, &position) in planet_positions.iter().enumerate() {
+            let model_matrix = create_model_matrix(position, 1.0, Vec3::new(0.0, 0.0, 0.0));
+            let planet_shader = match i {
+                0 => "continents_shader",
+                1 => "another_shader",
+                2 => "gradient_shader",
+                3 => "lava_shader",
+                4 => "lines_shader",
+                _ => "default_shader",
+            };
+
+            let uniforms = Uniforms {
+                model_matrix,
+                view_matrix: create_view_matrix(camera.eye, camera.center, camera.up),
+                projection_matrix: create_perspective_matrix(window_width as f32, window_height as f32),
+                viewport_matrix: create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32),
+                time,
+                noise: create_noise(),
+            };
+
+            render(&mut framebuffer, &uniforms, &vertex_arrays, planet_shader);
+        }
+
+        //Render nave
+        let model_matrix = create_model_matrix(spaceship.position, 1.0, spaceship.forward);
         let uniforms = Uniforms {
             model_matrix,
-            view_matrix,
-            projection_matrix,
-            viewport_matrix,
+            view_matrix: create_view_matrix(camera.eye, camera.center, camera.up),
+            projection_matrix: create_perspective_matrix(window_width as f32, window_height as f32),
+            viewport_matrix: create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32),
             time,
-            noise
+            noise: create_noise(),
         };
-
-        framebuffer.set_current_color(0xFFDDDD);
-
         render(&mut framebuffer, &uniforms, &ship_vertex_arrays, "spaceship_shader");
-        match current_planet {
-            Planet::PlainPlanet => {
-                render(&mut framebuffer, &uniforms, &vertex_arrays, "continents_shader");
-            }
-            Planet::RingPlanet => {
-                render(&mut framebuffer, &uniforms, &vertex_arrays, "spiral_shader");
-                render(&mut framebuffer, &uniforms, &rings_vertex_arrays, "rings_shader");
-            }
-            Planet::GasGigant => {
-                render(&mut framebuffer, &uniforms, &vertex_arrays, "cellular_shader");
-            }
-            Planet::Sun => {
-                render(&mut framebuffer, &uniforms, &vertex_arrays, "lava_shader");
-            }
-            Planet::GradientPlanet => {
-                render(&mut framebuffer, &uniforms, &vertex_arrays, "gradient_shader");
-            }
-            Planet::LinesPlanet => {
-                render(&mut framebuffer, &uniforms, &vertex_arrays, "lines_shader");
-            }
-            Planet::DotPlanet => {
-                render(&mut framebuffer, &uniforms, &vertex_arrays, "dalmata_shader");
-            }
-            Planet::None => {}
-        }
 
         window
             .update_with_buffer(&framebuffer.buffer, framebuffer_width, framebuffer_height)
@@ -280,72 +280,37 @@ fn main() {
     }
 }
 
-
-fn handle_input(window: &Window, camera: &mut Camera, current_planet: &mut Planet) {
-    let movement_speed = 1.0;
-    let rotation_speed = PI/50.0;
-    let zoom_speed = 0.1;
-   
-    //  camera orbit controls
-    if window.is_key_down(Key::Left) {
-      camera.orbit(rotation_speed, 0.0);
-    }
-    if window.is_key_down(Key::Right) {
-      camera.orbit(-rotation_speed, 0.0);
-    }
-    if window.is_key_down(Key::W) {
-      camera.orbit(0.0, -rotation_speed);
-    }
-    if window.is_key_down(Key::S) {
-      camera.orbit(0.0, rotation_speed);
-    }
-
-    // Camera movement controls
-    let mut movement = Vec3::new(0.0, 0.0, 0.0);
-    if window.is_key_down(Key::A) {
-      movement.x -= movement_speed;
-    }
-    if window.is_key_down(Key::D) {
-      movement.x += movement_speed;
-    }
-    if window.is_key_down(Key::Q) {
-      movement.y += movement_speed;
-    }
-    if window.is_key_down(Key::E) {
-      movement.y -= movement_speed;
-    }
-    if movement.magnitude() > 0.0 {
-      camera.move_center(movement);
-    }
-
-    // Camera zoom controls
+fn handle_input(window: &Window, spaceship: &mut Spaceship, camera: &mut Camera, planet_positions: &[Vec3]) {
+    let movement_speed = 0.1;
+    let rotation_speed = 0.1;
+    let planet_radius = 0.9;
+    // Movimiento de la nave
     if window.is_key_down(Key::Up) {
-      camera.zoom(zoom_speed);
+        let new_position = spaceship.position - spaceship.forward * movement_speed;
+        if !planet_positions.iter().any(|&planet_position| collision(new_position, planet_position, planet_radius)) {
+            spaceship.move_forward(-movement_speed);
+        }
     }
     if window.is_key_down(Key::Down) {
-      camera.zoom(-zoom_speed);
+        let new_position = spaceship.position + spaceship.forward * movement_speed;
+        if !planet_positions.iter().any(|&planet_position| collision(new_position, planet_position, planet_radius)) {
+            spaceship.move_forward(movement_speed);
+        }
+    }
+    //giro
+    if window.is_key_down(Key::Right) {
+        spaceship.rotate(-rotation_speed); 
+    }
+    if window.is_key_down(Key::Left) {
+        spaceship.rotate(rotation_speed);
     }
 
-    //Planet render
-    if window.is_key_pressed(Key::R, KeyRepeat::No) {
-        *current_planet = if *current_planet == Planet::PlainPlanet { Planet::None } else { Planet::PlainPlanet };
+    let mut movement = Vec3::new(0.0, 0.0, 0.0); // Movimiento 3D
+    // Verificacion colisiones
+    let new_camera_position = camera.eye + movement;
+    if !planet_positions.iter().any(|&planet_position| collision(new_camera_position, planet_position, planet_radius)) {
+        camera.eye = new_camera_position;
     }
-    if window.is_key_pressed(Key::T, KeyRepeat::No) {
-        *current_planet = if *current_planet == Planet::RingPlanet { Planet::None } else { Planet::RingPlanet };
-    }
-    if window.is_key_pressed(Key::Y, KeyRepeat::No) {
-        *current_planet = if *current_planet == Planet::GasGigant { Planet::None } else { Planet::GasGigant};
-    }
-    if window.is_key_pressed(Key::U, KeyRepeat::No) {
-        *current_planet = if *current_planet == Planet::GradientPlanet { Planet::None } else { Planet::GradientPlanet };
-    }
-    if window.is_key_pressed(Key::I, KeyRepeat::No) {
-        *current_planet = if *current_planet == Planet::LinesPlanet { Planet::None } else { Planet::LinesPlanet};
-    }
-    if window.is_key_pressed(Key::F, KeyRepeat::No) {
-        *current_planet = if *current_planet == Planet::Sun { Planet::None } else { Planet::Sun };
-    }
-    if window.is_key_pressed(Key::G, KeyRepeat::No) {
-        *current_planet = if *current_planet == Planet::DotPlanet { Planet::None } else { Planet::DotPlanet};
-    }
+    camera.center = spaceship.position;
+    camera.eye = spaceship.position + spaceship.forward * 10.0;
 }
